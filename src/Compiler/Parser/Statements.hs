@@ -10,6 +10,7 @@ data Statement =
     LetStatement (Identifier, Expression)
   | IfElseStatement (Expression, [Statement], [Statement])
   | WhileStatement (Expression, [Statement])
+  | DoStatement Term
   | ReturnStatement (Maybe Expression)
   deriving Show
 
@@ -41,10 +42,19 @@ whileStatement = do
     s <- braces $ many statement
     return (WhileStatement (e, s))
 
+doStatement :: Parser Statement
+doStatement = do
+    reserved "do"
+    f <- functionCall  <|> methodCall
+    reservedSymbol ";"
+    return (DoStatement f)
+
 returnStatement :: Parser Statement
 returnStatement = ReturnStatement <$> do
     reserved "return"
-    (Just <$> expression) <|> return Nothing
+    s <- (Just <$> expression) <|> return Nothing
+    reservedSymbol ";"
+    return s
 
 statement :: Parser Statement
-statement = letStatement <|> whileStatement <|> ifElseStatement <|> returnStatement
+statement = letStatement <|> whileStatement <|> ifElseStatement <|> doStatement <|> returnStatement

@@ -15,6 +15,8 @@ data Term =
   | UnaryExpression (UnaryOp, Term)
   | ArrayIndex (Identifier, Expression)
   | ExpressionTerm Expression
+  | FunctionCall (Identifier, [Expression])
+  | MethodCall (Identifier, Identifier, [Expression])
   deriving Show
 
 data Op = 
@@ -38,55 +40,52 @@ data UnaryOp =
 newtype Expression = 
     Expression (Term, [(Op, Term)])
     deriving Show
+  
+ops :: [(String, Op)]
+ops = [("+", Add),
+       ("-", Sub),
+       ("*", Mul),
+       ("/", Div),
+       ("&", And),
+       ("|", Or),
+       ("<", Less),
+       (">", Greater),
+       ("=", Assign)]
 
-ops :: [String]
-ops = ["+",
-       "-",
-       "*",
-       "/",
-       "&",
-       "|",
-       "<",
-       ">",
-       "="]
+unaryOps :: [(String, UnaryOp)]
+unaryOps = [("-", Negative), 
+            ("~", Tilde)]
 
-unaryOps :: [String]
-unaryOps = ["-", 
-            "~"]
-
-keywordConstants :: [String]
-keywordConstants = ["true",
-                    "false",
-                    "null",
-                    "this"]
+keywordConstants :: [(String, Term)]
+keywordConstants = [("true", BoolConstant True),
+                    ("false", BoolConstant False),
+                    ("null", Null),
+                    ("this", This)]
 
 -- TODO: Factor this into IntLiteral parsing
 intMax :: Int
 intMax = 32767
 
-opStringToOp :: String -> Op
-opStringToOp "+" = Add
-opStringToOp "-" = Sub
-opStringToOp "*" = Mul
-opStringToOp "/" = Div
-opStringToOp "&" = And
-opStringToOp "|" = Or
-opStringToOp "<" = Less
-opStringToOp ">" = Greater
-opStringToOp "=" = Assign
+stringToOp :: String -> Op
+stringToOp s = case lookup s ops of
+                  Nothing -> error (s ++ " is not a valid operator")
+                  (Just o) -> o
 
-unaryOpStringToUnaryOp :: String -> UnaryOp
-unaryOpStringToUnaryOp "-" = Negative
-unaryOpStringToUnaryOp "~" = Tilde
-
-reservedConstant :: String -> Parser String
-reservedConstant s = if s `elem` keywordConstants then token (string s) else error (s ++ " is not a valid keyword constant")
+stringToUnaryOp :: String -> UnaryOp
+stringToUnaryOp s = case lookup s unaryOps of
+                      Nothing -> error (s ++ " is not a valid unary operator")
+                      (Just o) -> o
+  
+stringToKeywordConstant :: String -> Term
+stringToKeywordConstant s = case lookup s keywordConstants of
+                              Nothing -> error (s ++ " is not a valid keyword constant")
+                              (Just o) -> o
 
 op :: Parser Op
-op = token $ opStringToOp <$> oneOfS ops
+op = token $ stringToOp <$> oneOfS (map fst ops)
 
 unaryOp :: Parser UnaryOp
-unaryOp = token $ unaryOpStringToUnaryOp <$> oneOfS unaryOps
+unaryOp = token $ stringToUnaryOp <$> oneOfS (map fst unaryOps)
 
 integerConstant :: Parser Term
 integerConstant = IntegerConstant . read <$> token number
@@ -94,17 +93,8 @@ integerConstant = IntegerConstant . read <$> token number
 stringConstant :: Parser Term
 stringConstant = StringConstant <$> token stringLiteral
 
-boolConstant :: Parser Term
-boolConstant = f <$> (reservedConstant "true" <|> reservedConstant "false")
-    where
-        f "true" = BoolConstant True
-        f "false" = BoolConstant False
-
-thisConstant :: Parser Term
-thisConstant = This <$ reservedConstant "this"
-
-nullConstant :: Parser Term
-nullConstant = Null <$ reservedConstant "null"
+keywordConstant :: Parser Term
+keywordConstant = token $ stringToKeywordConstant <$> oneOfS (map fst keywordConstants)
 
 unaryExpression :: Parser Term
 unaryExpression = do
@@ -119,7 +109,15 @@ arrayIndex = do
   return (ArrayIndex (i, e))
 
 term :: Parser Term
-term = arrayIndex <|> integerConstant <|> stringConstant <|> boolConstant <|> thisConstant <|> nullConstant <|> Var <$> identifier <|> unaryExpression <|> expressionTerm
+term = arrayIndex 
+   <|> integerConstant 
+   <|> stringConstant 
+   <|> keywordConstant 
+   <|> unaryExpression 
+   <|> expressionTerm
+   <|> functionCall
+   <|> methodCall
+   <|> Var <$> identifier 
 
 expression :: Parser Expression
 expression = Expression <$> do
@@ -136,12 +134,26 @@ expressionTerm :: Parser Term
 expressionTerm = ExpressionTerm <$> parens expression
   
 expressionList :: Parser [Expression]
-expressionList = parens (do
+expressionList = (do
     e <- expression
     es <- rest []
-    return (e:es))
+    return (e:es)) <|> return []
     where
       rest es = (do
         reservedSymbol ","
         e <- expression
-        rest (e:es)) <|> return es
+        rest (es ++ [e])) <|> return es
+
+functionCall :: Parser Term
+functionCall = do
+  i <- identifier
+  es <- parens expressionList
+  return (FunctionCall (i, es))
+
+methodCall :: Parser Term
+methodCall = do
+  c <- identifier
+  reservedSymbol "."
+  m <- identifier
+  es <- parens expressionList
+  return (MethodCall (c, m, es))

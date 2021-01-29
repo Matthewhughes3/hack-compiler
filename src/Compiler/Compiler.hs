@@ -1,7 +1,7 @@
 module Compiler.Compiler where
 
-import Compiler.Parser.Statements
+import Compiler.Parser.ProgramStructure
 import NanoParsec
 
 compile :: String -> String
-compile s = show $ runParser statement s
+compile s = show $ runParser classDec s

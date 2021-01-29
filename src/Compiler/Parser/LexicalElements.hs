@@ -4,18 +4,6 @@ import NanoParsec
 import Control.Applicative
 import Data.Char
 
-data Symbol = 
-    LP
-  | RP
-  | LB
-  | RB
-  | SC
-  deriving Show
-
-newtype Keyword = 
-    Keyword String
-    deriving Show
-
 newtype Identifier = 
     Identifier String
     deriving Show
@@ -63,13 +51,6 @@ keywords = ["class",
             "else",
             "while",
             "return"]
-
-symbolStringToSymbol :: String -> Symbol
-symbolStringToSymbol "(" = LP
-symbolStringToSymbol ")" = RP
-symbolStringToSymbol "{" = LB
-symbolStringToSymbol "}" = RB
-symbolStringToSymbol ";" = SC
 
 reserved :: String -> Parser String
 reserved s = if s `elem` keywords then token (string s) else error (s ++ " is not a valid keyword")
