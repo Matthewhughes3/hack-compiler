@@ -1,14 +1,14 @@
 module Compiler.Parser where
 
-import NanoParsec
 import Compiler.Parser.LexicalElements
+import NanoParsec
 
 surround :: String -> String -> Parser a -> Parser a
 surround s1 s2 p = do
-    reservedSymbol s1
-    r <- p
-    reservedSymbol s2
-    return r
+  reservedSymbol s1
+  r <- p
+  reservedSymbol s2
+  return r
 
 parens :: Parser a -> Parser a
 parens = surround "(" ")"

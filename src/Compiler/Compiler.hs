@@ -1,7 +1,7 @@
 module Compiler.Compiler where
 
-import Compiler.Parser.ProgramStructure
 import Compiler.CodeGenerator.ProgramStructure
+import Compiler.Parser.ProgramStructure
 import NanoParsec
 
 compile :: String -> String

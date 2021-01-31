@@ -31,14 +31,18 @@ returnAddress :: String
 returnAddress = "RETURN"
 
 segmentLabels :: [(String, String)]
-segmentLabels = [("local", local),
-            ("argument", argument),
-            ("this", this),
-            ("that", that)]
+segmentLabels =
+  [ ("local", local),
+    ("argument", argument),
+    ("this", this),
+    ("that", that)
+  ]
 
 baseAddresses :: [(String, String)]
-baseAddresses = [(stackPointer, "256"),
-                 (local, "1024"),
-                 (argument, "2048"),
-                 (this, "4096"),
-                 (that, "8192")]
+baseAddresses =
+  [ (stackPointer, "256"),
+    (local, "1024"),
+    (argument, "2048"),
+    (this, "4096"),
+    (that, "8192")
+  ]

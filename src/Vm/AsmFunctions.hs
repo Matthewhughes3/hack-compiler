@@ -3,23 +3,29 @@ module Vm.AsmFunctions where
 import Vm.Constants
 
 pushD :: [String]
-pushD = [stackPointer,
-         "AM=M+1",
-         "A=A-1",
-         "M=D"]
+pushD =
+  [ stackPointer,
+    "AM=M+1",
+    "A=A-1",
+    "M=D"
+  ]
 
 popD :: [String]
-popD = [stackPointer,
-        "AM=M-1",
-        "D=M"]
+popD =
+  [ stackPointer,
+    "AM=M-1",
+    "D=M"
+  ]
 
 pushLabel :: String -> [String]
-pushLabel label = [label,
-                   "D=M"] 
-                   ++ pushD
+pushLabel label =
+  [ label,
+    "D=M"
+  ]
+    ++ pushD
 
 pushLabels :: [String]
-pushLabels = concatMap (\(_,label) -> pushLabel label) segmentLabels
+pushLabels = concatMap (\(_, label) -> pushLabel label) segmentLabels
 
 makeLabel :: String -> Int -> String
 makeLabel label line = "(" ++ label ++ show line ++ ")"
@@ -28,10 +34,12 @@ getLabel :: String -> Int -> String
 getLabel label line = "@" ++ label ++ show line
 
 initAddress :: (String, String) -> [String]
-initAddress (segPtr, baseAddr) = ["@" ++ baseAddr,
-                                  "D=A",
-                                  segPtr,
-                                  "M=D"]
+initAddress (segPtr, baseAddr) =
+  [ "@" ++ baseAddr,
+    "D=A",
+    segPtr,
+    "M=D"
+  ]
 
 initAddresses :: [String]
-initAddresses = "//INITIALIZE BASE ADDRESSES":concatMap initAddress baseAddresses
+initAddresses = "//INITIALIZE BASE ADDRESSES" : concatMap initAddress baseAddresses
