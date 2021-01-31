@@ -28,7 +28,9 @@ main = do
         newFile <- writeAssembly file
         writeHex newFile
     else if extension == jackExtension then do
-        writeVm file
+        newFile <- writeVm file
+        newFile' <- writeAssembly newFile
+        writeHex newFile'
     else
         putStrLn "Must be a valid .vm or .asm file"
 
@@ -53,10 +55,13 @@ writeAssembly file = do
     writeFile newFile $ vm filename (zip contents [1..])
     return newFile
 
-writeVm :: String -> IO ()
+writeVm :: String -> IO String
 writeVm file = do
     contents <- readFile file
-    print $ Compiler.Compiler.compile contents
+    let (filename, _) = break (=='.') file
+    let newFile = filename ++ vmExtension
+    writeFile newFile $ Compiler.Compiler.compile contents
+    return newFile
 
 removeWhiteSpace :: String -> String
 removeWhiteSpace [] = []

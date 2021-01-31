@@ -28,13 +28,13 @@ data Op =
   | Or
   | Greater
   | Less
-  | Assign
-  deriving Show
+  | Equal
+  deriving (Show, Eq)
 
 data UnaryOp =
     Negative
-  | Tilde
-  deriving Show
+  | Not
+  deriving (Show, Eq)
 
 
 newtype Expression = 
@@ -50,11 +50,11 @@ ops = [("+", Add),
        ("|", Or),
        ("<", Less),
        (">", Greater),
-       ("=", Assign)]
+       ("=", Equal)]
 
 unaryOps :: [(String, UnaryOp)]
 unaryOps = [("-", Negative), 
-            ("~", Tilde)]
+            ("!", Not)]
 
 keywordConstants :: [(String, Term)]
 keywordConstants = [("true", BoolConstant True),

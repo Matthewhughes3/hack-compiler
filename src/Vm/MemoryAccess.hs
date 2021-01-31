@@ -18,7 +18,6 @@ segments = ["local",
             "constant",
             "static",
             "temp",
-            "screen",
             "pointer"]
 
 memoryAccessParser :: String -> Int -> Parser [String]
@@ -48,12 +47,10 @@ translateMemoryAccess filename line cmd seg i = case seg of
                                                 let ptr = if i == "0" then this else that
                                                 in  case cmd of
                                                         "push" -> [ptr,
-                                                                   "A=M",
-                                                                   "D=M"] 
+                                                                   "D=M"]
                                                                    ++ pushD
                                                         "pop" -> popD ++
                                                                   [ptr,
-                                                                  "A=M",
                                                                   "M=D"]
                                             else
                                                 error ("Error at line " ++ show line ++ ": Invalid pointer index " ++ i)
@@ -73,22 +70,6 @@ translateMemoryAccess filename line cmd seg i = case seg of
                                                                    "D=A"]
                                                                    ++ pushD
                                                         "pop" -> error ("Error at line " ++ show line ++ ": Cannot pop constant")
-                                        "screen" -> case cmd of
-                                                      "push" -> ["@" ++ i,
-                                                                 "D=A",
-                                                                 screen,
-                                                                 "A=A+D",
-                                                                 "D=M"] ++ pushD
-                                                      "pop" -> ["@" ++ i,
-                                                                "D=A",
-                                                                screen,
-                                                                "D=A+D",
-                                                                placeholder,
-                                                                "M=D"] 
-                                                                ++ popD ++
-                                                                [placeholder,
-                                                                "A=M",
-                                                                "M=D"]
                                         seg' -> case lookup seg' segmentLabels of
                                                     Nothing -> error ("Error at line " ++ show line ++ ": Invalid segment " ++ seg)
                                                     (Just segPtr) -> case cmd of 

@@ -10,31 +10,21 @@ newtype Class =
     Class (Identifier, [ClassStatement])
     deriving Show
 
-newtype ClassVar = 
-    ClassVar (ClassVarType, Type, [Identifier])
-    deriving Show
-
 data ClassStatement = 
-    ClassVarDec ClassVar
-  | ClassFunctionDec Function
+    ClassVarDec (VarScope, Type, [Identifier])
+  | FunctionDec (FunctionType, Maybe Type, Identifier, [(Type, Identifier)], [FunctionStatement])
   deriving Show
 
-newtype FunctionVar = 
-    FunctionVar (Type, [Identifier])
-    deriving Show
-
-newtype Function = 
-    FunctionDec (FunctionType, Maybe Type, Identifier, [(Type, Identifier)], [FunctionStatement])
-    deriving Show
-
-data FunctionStatement = 
-    FunctionVarDec FunctionVar
-  | FunctionStatement Statement
-  deriving Show
-
-data ClassVarType =
+data VarScope =
     Static
   | Field
+  | Argument
+  | Local
+  deriving (Show, Eq)
+
+data FunctionStatement = 
+    FunctionVarDec (Type, [Identifier])
+  | FunctionStatement Statement
   deriving Show
 
 data FunctionType =
@@ -50,9 +40,11 @@ data Type =
   | ClassType Identifier
   deriving Show
 
-classVarTypes :: [(String, ClassVarType)]
-classVarTypes = [("static", Static),
-                 ("field", Field)]
+varScopeTypes :: [(String, VarScope)]
+varScopeTypes = [("static", Static),
+                 ("field", Field),
+                 ("local", Local),
+                 ("argument", Argument)]
 
 functionTypes :: [(String, FunctionType)]
 functionTypes = [("constructor", Constructor),
@@ -64,8 +56,8 @@ types = [("int", IntType),
          ("char", CharType),
          ("bool", BoolType)]
 
-stringToClassVarType :: String -> ClassVarType
-stringToClassVarType s = case lookup s classVarTypes of
+stringToVarScope :: String -> VarScope
+stringToVarScope s = case lookup s varScopeTypes of
                              Nothing -> error (s ++ " is not a valid class var type")
                              (Just c) -> c
 
@@ -85,17 +77,17 @@ varTypes = token $ (stringToType <$> oneOfS (map fst types)) <|> (ClassType <$> 
 functionType :: Parser FunctionType
 functionType = token $ stringToFunctionType <$> oneOfS (map fst functionTypes)
 
-classVarType :: Parser ClassVarType
-classVarType = token $ stringToClassVarType <$> oneOfS (map fst classVarTypes)
+varScope :: Parser VarScope
+varScope = token $ stringToVarScope <$> oneOfS (map fst varScopeTypes)
 
-functionVar :: Parser FunctionVar
+functionVar :: Parser FunctionStatement
 functionVar = do
     reserved "var"
     t <- varTypes
     i <- identifier
     is <- rest [i]
     reservedSymbol ";"
-    return (FunctionVar (t,is))
+    return (FunctionVarDec (t,is))
     where
         rest is = (do
             reservedSymbol ","
@@ -115,9 +107,9 @@ parameterList = (do
             rest (tis ++ [(t,i)])) <|> return tis
 
 functionStatement :: Parser FunctionStatement
-functionStatement = FunctionVarDec <$> functionVar <|> FunctionStatement <$> statement
+functionStatement = functionVar <|> FunctionStatement <$> statement
 
-function :: Parser Function
+function :: Parser ClassStatement
 function = do
     ft <- functionType
     t <- Just <$> varTypes <|> Nothing <$ reserved "void"
@@ -126,14 +118,18 @@ function = do
     fs <- braces $ many functionStatement
     return (FunctionDec (ft, t, i, ps, fs))
 
-classVar :: Parser ClassVar
+classVar :: Parser ClassStatement
 classVar = do
-    ct <- classVarType
-    t <- varTypes
-    i <- identifier
-    is <- rest [i]
-    reservedSymbol ";"
-    return (ClassVar (ct,t,is))
+    vs <- varScope
+    if vs /= Static && vs /= Field then
+        error ("Invalid class var scope " ++ show vs)
+    else
+        do
+        t <- varTypes
+        i <- identifier
+        is <- rest [i]
+        reservedSymbol ";"
+        return (ClassVarDec (vs,t,is))
     where 
         rest is = (do
             reservedSymbol ","
@@ -141,7 +137,7 @@ classVar = do
             rest (is ++ [i])) <|> return is
 
 classStatement :: Parser ClassStatement
-classStatement = ClassVarDec <$> classVar <|> ClassFunctionDec <$> function
+classStatement = classVar <|> function
 
 classDec :: Parser Class
 classDec = do

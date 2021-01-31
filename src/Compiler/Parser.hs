@@ -3,23 +3,18 @@ module Compiler.Parser where
 import NanoParsec
 import Compiler.Parser.LexicalElements
 
-parens :: Parser a -> Parser a
-parens p = do
-    reservedSymbol "("
+surround :: String -> String -> Parser a -> Parser a
+surround s1 s2 p = do
+    reservedSymbol s1
     r <- p
-    reservedSymbol ")"
+    reservedSymbol s2
     return r
+
+parens :: Parser a -> Parser a
+parens = surround "(" ")"
 
 braces :: Parser a -> Parser a
-braces p = do
-    reservedSymbol "{"
-    r <- p
-    reservedSymbol "}"
-    return r
+braces = surround "{" "}"
 
 squareBrackets :: Parser a -> Parser a
-squareBrackets p = do
-    reservedSymbol "["
-    r <- p
-    reservedSymbol "]"
-    return r
+squareBrackets = surround "[" "]"

@@ -33,6 +33,10 @@ library
       Assembler.Hex
       Assembler.Label
       Assembler.Tables
+      Compiler.CodeGenerator.Expressions
+      Compiler.CodeGenerator.ProgramStructure
+      Compiler.CodeGenerator.Statements
+      Compiler.CodeGenerator.Types
       Compiler.Compiler
       Compiler.Parser
       Compiler.Parser.Expressions

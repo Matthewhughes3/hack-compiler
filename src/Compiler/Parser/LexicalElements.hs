@@ -6,7 +6,7 @@ import Data.Char
 
 newtype Identifier = 
     Identifier String
-    deriving Show
+    deriving (Show, Eq)
 
 symbols :: [String]
 symbols = ["{",
@@ -18,7 +18,7 @@ symbols = ["{",
            ".",
            ",",
            ";",
-           "~",
+           "!",
            "+",
            "-",
            "*",

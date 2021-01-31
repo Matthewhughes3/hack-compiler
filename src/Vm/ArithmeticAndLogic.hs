@@ -30,7 +30,7 @@ translateCommand line cmd = case cmd of
               "M=D+M"]
     "sub" -> popD ++
               ["A=A-1",
-              "M=M-D"]
+              "M=D-M"]
     "neg" -> [stackPointer,
               "A=M-1",
               "M=-M"]
@@ -51,7 +51,7 @@ translateCommand line cmd = case cmd of
              makeLabel "ENDEQ" line]
     "gt" -> popD ++
              ["A=A-1",
-             "D=M-D",
+             "D=D-M",
              getLabel "GT" line,
              "D; JGT",
              stackPointer,
@@ -66,7 +66,7 @@ translateCommand line cmd = case cmd of
              makeLabel "ENDGT" line]
     "lt" -> popD ++
              ["A=A-1",
-             "D=M-D",
+             "D=D-M",
              getLabel "LT" line,
              "D; JLT",
              stackPointer,
@@ -87,4 +87,15 @@ translateCommand line cmd = case cmd of
               "M=D|M"]
     "not" -> [stackPointer,
               "A=M-1",
-              "M=!M"]
+              "D=M",
+              getLabel "FALSE" line,
+              "D; JEQ",
+              "D=0",
+              getLabel "ENDNOT" line,
+              "0; JMP",
+              makeLabel "FALSE" line,
+              "D=1",
+              makeLabel "ENDNOT" line,
+              stackPointer,
+              "A=M-1",
+              "M=D"]
