@@ -7,9 +7,6 @@ type Base = Int
 startsWithDigit :: String -> Bool
 startsWithDigit (s : _) = isDigit s
 
-testList :: [[String]]
-testList = [["hello", "world"], ["how", "are", "you"]]
-
 zipListOfLists :: [[String]] -> Int -> [[(String, Int)]]
 zipListOfLists [] _ = []
 zipListOfLists (l : ls) x = zip l [x ..] : zipListOfLists ls (x + length l)

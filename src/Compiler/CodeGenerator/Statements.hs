@@ -7,11 +7,11 @@ import Compiler.Parser.Statements
 import Control.Applicative
 
 makeUniqueId :: Environment -> String
-makeUniqueId (cn, fn, _, code) = "." ++ show cn ++ "." ++ show fn ++ "." ++ show (length code)
+makeUniqueId env = "." ++ show (cn env) ++ "." ++ show (fn env) ++ "." ++ show (length (code env))
 
 evalStatement :: Statement -> Environment -> Code
-evalStatement (LetStatement (i, ae, e)) env@(cn, fn, symbols, _) =
-  let (Just (vs, _, vi)) = lookup (i, fn) symbols <|> lookup (i, cn) symbols
+evalStatement (LetStatement (i, ae, e)) env =
+  let (Just (vs, _, vi)) = lookup (i, fn env) (st env) <|> lookup (i, cn env) (st env)
       ce = evalExpression e env
    in case ae of
         Nothing ->
@@ -28,7 +28,7 @@ evalStatement (LetStatement (i, ae, e)) env@(cn, fn, symbols, _) =
                      "push temp 0",
                      "pop that 0"
                    ]
-evalStatement (IfElseStatement (e, ists, ests)) env@(cn, fn, _, code) =
+evalStatement (IfElseStatement (e, ists, ests)) env =
   let ce = evalExpression e env
       cists = map (flip evalStatement env) ists
       cests = map (flip evalStatement env) ests
@@ -42,7 +42,7 @@ evalStatement (IfElseStatement (e, ists, ests)) env@(cn, fn, _, code) =
            ]
         ++ concat cests
         ++ ["label IF" ++ makeUniqueId env]
-evalStatement (WhileStatement (e, sts)) env@(cn, fn, symbols, code) =
+evalStatement (WhileStatement (e, sts)) env =
   let ce = evalExpression e env
       csts = map (flip evalStatement env) sts
    in ["label WHILE" ++ makeUniqueId env]

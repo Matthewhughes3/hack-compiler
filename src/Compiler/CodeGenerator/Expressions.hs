@@ -49,8 +49,8 @@ unaryToOp u =
     (Just u') -> u'
 
 evalTerm :: Term -> Environment -> Code
-evalTerm (Var i) (cn, fn, symbols, _) =
-  let (Just (vs, _, vi)) = lookup (i, fn) symbols <|> lookup (i, cn) symbols
+evalTerm (Var i) env =
+  let (Just (vs, _, vi)) = lookup (i, fn env) (st env) <|> lookup (i, cn env) (st env)
    in ["push " ++ varScopeToMemorySegment vs ++ " " ++ show vi]
 evalTerm (IntegerConstant i) _ = ["push constant " ++ show i]
 evalTerm (StringConstant s) _ = undefined
@@ -61,9 +61,9 @@ evalTerm (UnaryExpression (u, t)) sc =
   let tc = evalTerm t sc
       uo = unaryToOp u
    in tc ++ [uo]
-evalTerm (ArrayIndex (i, e)) sc@(cn, fn, symbols, _) =
-  let (Just (vs, _, vi)) = lookup (i, fn) symbols <|> lookup (i, cn) symbols
-      ce = evalExpression e sc
+evalTerm (ArrayIndex (i, e)) env =
+  let (Just (vs, _, vi)) = lookup (i, fn env) (st env) <|> lookup (i, cn env) (st env)
+      ce = evalExpression e env
    in ["push " ++ varScopeToMemorySegment vs ++ " " ++ show vi]
         ++ ce
         ++ [ "add",
@@ -71,14 +71,14 @@ evalTerm (ArrayIndex (i, e)) sc@(cn, fn, symbols, _) =
              "push that 0"
            ]
 evalTerm (ExpressionTerm e) sc = evalExpression e sc
-evalTerm (FunctionCall (Identifier n, es)) sc@(cn, _, _, _) =
-  let ces = map (flip evalExpression sc) es
+evalTerm (FunctionCall (Identifier n, es)) env =
+  let ces = map (flip evalExpression env) es
       argCount = length ces
-   in concat ces ++ ["call " ++ show cn ++ "." ++ n ++ " " ++ show argCount]
-evalTerm (MethodCall (ci, mi, es)) sc@(_, fn, symbols, _) =
-  let ces = map (flip evalExpression sc) es
+   in concat ces ++ ["call " ++ show (cn env) ++ "." ++ n ++ " " ++ show argCount]
+evalTerm (MethodCall (ci, mi, es)) env =
+  let ces = map (flip evalExpression env) es
       argCount = length ces
-   in case lookup (ci, fn) symbols of
+   in case lookup (ci, fn env) (st env) of
         (Just (vs, ClassType n, vi)) ->
           ["push " ++ varScopeToMemorySegment vs ++ " " ++ show vi]
             ++ concat ces
@@ -89,9 +89,9 @@ evalTerm (MethodCall (ci, mi, es)) sc@(_, fn, symbols, _) =
             ++ ["call " ++ show ci ++ "." ++ show mi ++ " " ++ show argCount]
 
 evalExpression :: Expression -> Environment -> Code
-evalExpression (Expression (t, ots)) sc =
+evalExpression (Expression (t, ots)) env =
   let os = map fst ots
       ts = reverse $ map snd ots
-      cts = concat $ map (flip evalTerm sc) ts ++ [evalTerm t sc]
+      cts = concat $ map (flip evalTerm env) ts ++ [evalTerm t env]
       cos = map opToArithmeticAndLogic os
    in cts ++ cos

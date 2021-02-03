@@ -9,4 +9,10 @@ type VarProperties = (VarScope, Type, Int)
 
 type Code = [String]
 
-type Environment = (Identifier, Identifier, VarTable, Code)
+data Environment = Environment
+  { fn :: Identifier,
+    cn :: Identifier,
+    st :: VarTable,
+    lc :: Code,
+    code :: Code
+  }
