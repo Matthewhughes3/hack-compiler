@@ -8,46 +8,56 @@ import Compiler.Parser.ProgramStructure
 evalClass :: Class -> Code
 evalClass (Class (n, cs)) =
   let (_, code) = foldl (\(s, c) st -> evalClassStatement n st (s, c)) ([], []) cs
-   in [ "call Main.main 0",
-        "goto END"
-      ]
-        ++ concat code
-        ++ [ "label END",
-             "goto END"
-           ]
+   in concat code
 
 getLocalVarCount :: VarTable -> Int
 getLocalVarCount vt = length $ filter (\(_, (vs, _, _)) -> vs == Local) vt
 
 evalClassStatement :: Identifier -> ClassStatement -> (VarTable, [Code]) -> (VarTable, [Code])
-evalClassStatement n (ClassVarDec (vs, t, is)) (symbols, code) =
+evalClassStatement cn (ClassVarDec (vs, t, is)) (symbols, code) =
   let tis = map (\i -> (t, i)) is
-   in (getVar n (vs, tis) [] ++ symbols, code)
-evalClassStatement cn (FunctionDec (_, _, fn, tis, fs)) (symbols, code) =
-  let argumentVars = getVar fn (Argument, tis) []
+   in (getVar (-1) cn (vs, tis) symbols ++ symbols, code)
+evalClassStatement cn (FunctionDec (ft, _, fn, tis, fs)) (symbols, code) =
+  let argumentVars = case ft of
+        Method -> getVar 0 fn (Argument, tis) symbols
+        _ -> getVar (-1) fn (Argument, tis) symbols
       (localVars, funcCode) =
         foldl
-          (\(s, c) f -> evalFunctionStatement cn fn f (s, c))
+          (\(s, c) f -> evalFunctionStatement f (cn, fn, s, c))
           (argumentVars, [])
           fs
       lvc = getLocalVarCount localVars
       (Identifier cns) = cn
       (Identifier ns) = fn
-      code' = ("function " ++ cns ++ "." ++ ns ++ " " ++ show lvc) : funcCode
+      functionHeader = ("function " ++ cns ++ "." ++ ns ++ " " ++ show lvc)
+      fullFunctionHeader =
+        functionHeader : case ft of
+          Constructor ->
+            let fieldCount = length $ filter (\((_, n), (vs, _, _)) -> n == cn && vs == Field) symbols
+             in [ "push constant " ++ show fieldCount,
+                  "call Memory.alloc 1",
+                  "pop pointer 0"
+                ]
+          Method ->
+            [ "push argument 0",
+              "pop pointer 0"
+            ]
+          Function -> []
+      code' = fullFunctionHeader ++ funcCode
    in (localVars ++ symbols, code ++ [code'])
 
-evalFunctionStatement :: Identifier -> Identifier -> FunctionStatement -> (VarTable, Code) -> (VarTable, Code)
-evalFunctionStatement cn n (FunctionVarDec (t, is)) (symbols, code) =
+evalFunctionStatement :: FunctionStatement -> Environment -> (VarTable, Code)
+evalFunctionStatement (FunctionVarDec (t, is)) (cn, fn, symbols, code) =
   let tis = map (\i -> (t, i)) is
-   in (getVar n (Local, tis) symbols, code)
-evalFunctionStatement cn fn (FunctionStatement st) (symbols, code) =
-  let cst = evalStatement cn fn st (symbols, code)
+   in (getVar (-1) fn (Local, tis) symbols, code)
+evalFunctionStatement (FunctionStatement st) env@(_, _, symbols, code) =
+  let cst = evalStatement st env
    in (symbols, code ++ cst)
 
-getVar :: Identifier -> (VarScope, [(Type, Identifier)]) -> VarTable -> VarTable
-getVar _ (_, []) symbols = symbols
-getVar n (vs, (t, i) : tis) symbols =
+getVar :: Int -> Identifier -> (VarScope, [(Type, Identifier)]) -> VarTable -> VarTable
+getVar _ _ (_, []) symbols = symbols
+getVar index n (vs, (t, i) : tis) symbols =
   let scopeVars = filter (\((_, n'), (vs', _, _)) -> n == n' && vs == vs') symbols
       scopeIndices = map (\(_, (_, _, i)) -> i) scopeVars
-      lastIndex = foldl (\acc x -> if x > acc then x else acc) (-1) scopeIndices
-   in getVar n (vs, tis) (((i, n), (vs, t, lastIndex + 1)) : symbols)
+      lastIndex = foldl (\acc x -> if x > acc then x else acc) index scopeIndices
+   in getVar index n (vs, tis) (((i, n), (vs, t, lastIndex + 1)) : symbols)

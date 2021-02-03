@@ -85,10 +85,31 @@ translateMemoryAccess filename line cmd seg i = case seg of
       else error ("Error at line " ++ show line ++ ": Invalid temp index " ++ i)
   "constant" -> case cmd of
     "push" ->
-      [ "@" ++ i,
-        "D=A"
-      ]
-        ++ pushD
+      if read i <= constantMax
+        then
+          [ "@" ++ i,
+            "D=A"
+          ]
+            ++ pushD
+        else
+          let i' = read i - constantMax
+           in if i' <= constantMax
+                then
+                  [ "@" ++ show constantMax,
+                    "D=A",
+                    "@" ++ show i',
+                    "D=D+A"
+                  ]
+                    ++ pushD
+                else
+                  let i'' = i' - constantMax
+                   in [ "@" ++ show constantMax,
+                        "D=A",
+                        "D=D+A",
+                        "@" ++ show i'',
+                        "D=D+A"
+                      ]
+                        ++ pushD
     "pop" -> error ("Error at line " ++ show line ++ ": Cannot pop constant")
   seg' -> case lookup seg' segmentLabels of
     Nothing -> error ("Error at line " ++ show line ++ ": Invalid segment " ++ seg)

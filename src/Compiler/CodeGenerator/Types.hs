@@ -8,3 +8,5 @@ type VarTable = [((Identifier, Identifier), VarProperties)]
 type VarProperties = (VarScope, Type, Int)
 
 type Code = [String]
+
+type Environment = (Identifier, Identifier, VarTable, Code)

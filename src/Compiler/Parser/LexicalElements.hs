@@ -6,7 +6,10 @@ import NanoParsec
 
 newtype Identifier
   = Identifier String
-  deriving (Show, Eq)
+  deriving (Eq)
+
+instance Show Identifier where
+  show (Identifier x) = x
 
 symbols :: [String]
 symbols =

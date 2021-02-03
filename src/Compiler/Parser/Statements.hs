@@ -7,7 +7,7 @@ import Control.Applicative
 import NanoParsec
 
 data Statement
-  = LetStatement (Identifier, Expression)
+  = LetStatement (Identifier, Maybe Expression, Expression)
   | IfElseStatement (Expression, [Statement], [Statement])
   | WhileStatement (Expression, [Statement])
   | DoStatement Term
@@ -18,10 +18,11 @@ letStatement :: Parser Statement
 letStatement = do
   reserved "let"
   i <- identifier
+  ae <- Just <$> squareBrackets expression <|> return Nothing
   reservedSymbol "="
   e <- expression
   reservedSymbol ";"
-  return (LetStatement (i, e))
+  return (LetStatement (i, ae, e))
 
 ifElseStatement :: Parser Statement
 ifElseStatement = do

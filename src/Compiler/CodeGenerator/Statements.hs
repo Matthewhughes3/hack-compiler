@@ -4,45 +4,61 @@ import Compiler.CodeGenerator.Expressions
 import Compiler.CodeGenerator.Types
 import Compiler.Parser.LexicalElements
 import Compiler.Parser.Statements
+import Control.Applicative
 
-evalStatement :: Identifier -> Identifier -> Statement -> (VarTable, Code) -> Code
-evalStatement cn fn (LetStatement (i, e)) (symbols, code) =
-  let (vs, _, vi) = case lookup (i, fn) symbols of
-        Nothing -> case lookup (i, cn) symbols of
-          Nothing -> error (show i ++ " has not been declared")
-          (Just x) -> x
-        (Just x) -> x
-   in evalExpression cn fn e (symbols, code)
-        ++ ["pop " ++ varScopeToMemorySegment vs ++ " " ++ show vi]
-evalStatement cn fn (IfElseStatement (e, ists, ests)) (symbols, code) =
-  let ce = evalExpression cn fn e (symbols, code)
-      cists = map (\st -> evalStatement cn fn st (symbols, code)) ists
-      cests = map (\st -> evalStatement cn fn st (symbols, code)) ests
+makeUniqueId :: Environment -> String
+makeUniqueId (cn, fn, _, code) = "." ++ show cn ++ "." ++ show fn ++ "." ++ show (length code)
+
+evalStatement :: Statement -> Environment -> Code
+evalStatement (LetStatement (i, ae, e)) env@(cn, fn, symbols, _) =
+  let (Just (vs, _, vi)) = lookup (i, fn) symbols <|> lookup (i, cn) symbols
+      ce = evalExpression e env
+   in case ae of
+        Nothing ->
+          ce
+            ++ ["pop " ++ varScopeToMemorySegment vs ++ " " ++ show vi]
+        (Just ae') ->
+          let cae = evalExpression ae' env
+           in ["push " ++ varScopeToMemorySegment vs ++ " " ++ show vi]
+                ++ cae
+                ++ ["add"]
+                ++ ce
+                ++ [ "pop temp 0",
+                     "pop pointer 1",
+                     "push temp 0",
+                     "pop that 0"
+                   ]
+evalStatement (IfElseStatement (e, ists, ests)) env@(cn, fn, _, code) =
+  let ce = evalExpression e env
+      cists = map (flip evalStatement env) ists
+      cests = map (flip evalStatement env) ests
    in ce
         ++ [ "not",
-             "if-goto L1." ++ show (length code)
+             "if-goto ELSE" ++ makeUniqueId env
            ]
         ++ concat cists
-        ++ [ "goto L2." ++ show (length code),
-             "label L1." ++ show (length code)
+        ++ [ "goto IF" ++ makeUniqueId env,
+             "label ELSE" ++ makeUniqueId env
            ]
         ++ concat cests
-        ++ ["label L2." ++ show (length code)]
-evalStatement cn fn (WhileStatement (e, sts)) (symbols, code) =
-  let ce = evalExpression cn fn e (symbols, code)
-      csts = map (\st -> evalStatement cn fn st (symbols, code)) sts
-   in ["label L1." ++ show (length code)]
+        ++ ["label IF" ++ makeUniqueId env]
+evalStatement (WhileStatement (e, sts)) env@(cn, fn, symbols, code) =
+  let ce = evalExpression e env
+      csts = map (flip evalStatement env) sts
+   in ["label WHILE" ++ makeUniqueId env]
         ++ ce
         ++ [ "not",
-             "if-goto L2." ++ show (length code)
+             "if-goto ENDWHILE" ++ makeUniqueId env
            ]
         ++ concat csts
-        ++ [ "goto L1." ++ show (length code),
-             "label L2." ++ show (length code)
+        ++ [ "goto WHILE"
+               ++ makeUniqueId env,
+             "label ENDWHILE"
+               ++ makeUniqueId env
            ]
-evalStatement cn fn (DoStatement t) sc = evalTerm cn fn t sc ++ ["pop temp 0"]
-evalStatement cn fn (ReturnStatement e) sc =
+evalStatement (DoStatement t) env = evalTerm t env ++ ["pop temp 0"]
+evalStatement (ReturnStatement e) env =
   let value = case e of
         Nothing -> ["push constant 0"]
-        (Just e') -> evalExpression cn fn e' sc
+        (Just e') -> evalExpression e' env
    in value ++ ["return"]

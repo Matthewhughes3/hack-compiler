@@ -2,6 +2,7 @@ module Assembler.CInstruction where
 
 import Assembler.Tables
 import Control.Applicative
+import Assembler.Bin
 import NanoParsec
 
 endsWithEquals :: String -> Bool
@@ -37,7 +38,7 @@ cJmp =
             <|> return []
         )
 
-cInstruction :: Parser String
+cInstruction :: Parser Bin
 cInstruction =
   compileCInstruction
     <$> ( do
@@ -47,8 +48,8 @@ cInstruction =
             return (dest, comp, jmp)
         )
 
-compileCInstruction :: (String, String, String) -> String
-compileCInstruction (dest, comp, jmp) = "111" ++ comp ++ dest ++ jmp
+compileCInstruction :: (String, String, String) -> Bin
+compileCInstruction (dest, comp, jmp) = read ("111" ++ comp ++ dest ++ jmp)
 
 compileCDest :: String -> String
 compileCDest s =

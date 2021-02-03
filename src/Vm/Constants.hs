@@ -46,3 +46,6 @@ baseAddresses =
     (this, "4096"),
     (that, "8192")
   ]
+
+constantMax :: Int
+constantMax = 32767

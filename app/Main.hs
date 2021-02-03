@@ -2,6 +2,9 @@ module Main where
 
 import Assembler.Assembler
 import Compiler.Compiler
+import Data.List
+import Helpers
+import System.Directory
 import System.Environment
 import System.IO
 import Vm.Vm
@@ -20,52 +23,92 @@ hexExtension = ".hex"
 
 main :: IO ()
 main = do
-  [file] <- getArgs
-  let (_, extension) = break (== '.') file
+  args <- getArgs
+  let [file] = filter (notElem '-') args
+  let filename = takeWhile (/= '.') file
+  let options = sort $ concatMap (dropWhile (== '-')) $ filter (elem '-') args
+  case options of
+    "" -> noArgs file
+    "Da" -> error "Cannot compile assembly in directory mode"
+    "Dv" -> do
+      files <- listDirectory file
+      contents <- concat <$> mapM readFile files
+      contents' <- writeAssembly contents (filename ++ "/" ++ filename)
+      writeHex contents' filename
+    "Dj" -> do
+      files <- listDirectory file
+      let readFiles = map (\f -> "./" ++ file ++ "/" ++ f) files
+      let filenames = map (takeWhile (/= '.')) files
+      contents <- mapM readFile readFiles
+      contents' <- flip zipListOfLists 0 . map lines <$> mapM (uncurry writeVm) (zip contents filenames)
+      let contents'' = concatMap (uncurry vm) (zip filenames contents')
+      let header = vm "" (zip ["call Main.main 0", "goto END"] [1 ..])
+      let footer = vm "" (zip ["label END", "goto END"] [1 ..])
+      let code = header ++ contents'' ++ footer
+      writeFile ("dist/" ++ filename ++ assemblyExtension) code
+      writeHex code filename
+    "a" -> do
+      contents <- readFile file
+      writeHex contents filename
+    "v" -> do
+      contents <- readFile file
+      contents' <- writeAssembly contents filename
+      writeHex contents' filename
+    "j" -> do
+      contents <- readFile file
+      contents' <- writeVm contents filename
+      contents'' <- writeAssembly contents' filename
+      writeHex contents'' filename
+
+noArgs :: String -> IO ()
+noArgs file = do
+  let (filename, extension) = break (== '.') file
   if extension == assemblyExtension
     then do
-      writeHex file
+      contents <- readFile file
+      writeHex contents filename
     else
       if extension == vmExtension
         then do
-          newFile <- writeAssembly file
-          writeHex newFile
+          contents <- readFile file
+          contents' <- writeAssembly contents filename
+          writeHex contents' filename
         else
           if extension == jackExtension
             then do
-              newFile <- writeVm file
-              newFile' <- writeAssembly newFile
-              writeHex newFile'
-            else putStrLn "Must be a valid .vm or .asm file"
+              contents <- readFile file
+              contents' <- writeVm contents filename
+              contents'' <- writeAssembly contents' filename
+              writeHex contents'' filename
+            else putStrLn "Must be a valid .jack, .vm or .asm file"
 
 formatAsm :: String -> [String]
 formatAsm = removeEmptyLines . map (removeWhiteSpace . removeComment) . lines
 
-writeHex :: String -> IO ()
-writeHex file = do
-  contents <- formatAsm <$> readFile file
-  let (filename, _) = break (== '.') file
+writeHex :: String -> String -> IO ()
+writeHex contents filename = do
+  let contents' = formatAsm contents
   let newFile = filename ++ hexExtension
-  writeFile newFile $ assemble contents
+  writeFile ("dist/" ++ newFile) $ assemble contents'
 
 formatVm :: String -> [String]
 formatVm = removeEmptyLines . map removeComment . lines
 
-writeAssembly :: String -> IO String
-writeAssembly file = do
-  contents <- formatVm <$> readFile file
-  let (filename, _) = break (== '.') file
+writeAssembly :: String -> String -> IO String
+writeAssembly contents filename = do
+  let contents' = formatVm contents
   let newFile = filename ++ assemblyExtension
-  writeFile newFile $ vm filename (zip contents [1 ..])
-  return newFile
+  let code = ["call Main.main 0", "goto END"] ++ contents' ++ ["label END", "goto END"]
+  let contents' = vm filename (zip code [1 ..])
+  writeFile ("dist/" ++ newFile) contents'
+  return contents'
 
-writeVm :: String -> IO String
-writeVm file = do
-  contents <- readFile file
-  let (filename, _) = break (== '.') file
+writeVm :: String -> String -> IO String
+writeVm contents filename = do
   let newFile = filename ++ vmExtension
-  writeFile newFile $ Compiler.Compiler.compile contents
-  return newFile
+  let contents' = Compiler.Compiler.compile contents
+  writeFile ("dist/" ++ newFile) contents'
+  return contents'
 
 removeWhiteSpace :: String -> String
 removeWhiteSpace [] = []

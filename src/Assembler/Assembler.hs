@@ -1,6 +1,7 @@
 module Assembler.Assembler where
 
 import Assembler.AInstruction
+import Assembler.Bin
 import Assembler.CInstruction
 import Assembler.Constants
 import Assembler.Hex
@@ -11,10 +12,29 @@ import NanoParsec
 assemble :: [String] -> String
 assemble contents =
   let labels = storeLabels contents
-      bin = hexToString $ map (map binToHex . chunksOf 4) $ (compile . replaceLabels labels labelAllocStart . removeLabels) contents
-   in "v2.0 raw\n" ++ bin
+      bin = (compile . replaceLabels labels labelAllocStart . removeLabels) contents
+   in intelHex bin
 
-compile :: [String] -> [String]
+logisimHex :: [Bin] -> String
+logisimHex contents = "v2.0 raw\n" ++ foldl (\acc h -> acc ++ " " ++ show h) "" (map binToHex contents)
+
+intelHex :: [Bin] -> String
+intelHex bs = unlines $ intelH 0 bs
+  where
+    intelH x [] = []
+    intelH x (b : bs) = intelHexLine b x : intelH (x + 2) bs
+
+intelHexLine :: Bin -> Int -> String
+intelHexLine bin startAddr =
+  let addr = Hex (startAddr, 4)
+      d = showLittleEndian $ binToHex bin
+      t = Hex (0, 2)
+      byteCount = Hex (2, 2)
+      hs = read (show (hexAppend [byteCount, addr, t]) ++ d)
+      cs = checksum hs
+   in ':' : show hs ++ show cs
+
+compile :: [String] -> [Bin]
 compile [] = []
 compile (x : xs) =
   case parse (aInstruction <|> cInstruction) x of

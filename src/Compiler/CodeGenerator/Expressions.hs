@@ -4,6 +4,7 @@ import Compiler.CodeGenerator.Types
 import Compiler.Parser.Expressions
 import Compiler.Parser.LexicalElements
 import Compiler.Parser.ProgramStructure
+import Control.Applicative
 
 memorySegments :: [(VarScope, String)]
 memorySegments =
@@ -17,8 +18,8 @@ arithmeticAndLogic :: [(Op, String)]
 arithmeticAndLogic =
   [ (Add, "add"),
     (Sub, "sub"),
-    (Mul, "call Math.mult 2"),
-    (Div, "call Math.div 2"),
+    (Mul, "call Math.multiply 2"),
+    (Div, "call Math.divide 2"),
     (And, "and"),
     (Or, "or"),
     (Greater, "gt"),
@@ -47,40 +48,50 @@ unaryToOp u =
   case lookup u unary of
     (Just u') -> u'
 
-evalTerm :: Identifier -> Identifier -> Term -> (VarTable, Code) -> Code
-evalTerm _ fn (Var i) (symbols, _) =
-  case lookup (i, fn) symbols of
-    Nothing -> error (show i ++ " has not been declared")
-    (Just (vs, _, vi)) -> ["push " ++ varScopeToMemorySegment vs ++ " " ++ show vi]
-evalTerm _ _ (IntegerConstant i) _ = ["push constant " ++ show i]
-evalTerm _ _ (StringConstant s) (_, code) = undefined
-evalTerm _ _ (BoolConstant b) _ = if b then ["push constant 1"] else ["push constant 0"]
-evalTerm _ _ This (_, code) = undefined
-evalTerm _ _ Null (_, code) = ["push constant 0"]
-evalTerm cn fn (UnaryExpression (u, t)) sc =
-  let tc = evalTerm cn fn t sc
+evalTerm :: Term -> Environment -> Code
+evalTerm (Var i) (cn, fn, symbols, _) =
+  let (Just (vs, _, vi)) = lookup (i, fn) symbols <|> lookup (i, cn) symbols
+   in ["push " ++ varScopeToMemorySegment vs ++ " " ++ show vi]
+evalTerm (IntegerConstant i) _ = ["push constant " ++ show i]
+evalTerm (StringConstant s) _ = undefined
+evalTerm (BoolConstant b) _ = if b then ["push constant 1"] else ["push constant 0"]
+evalTerm This _ = ["push pointer 0"]
+evalTerm Null _ = ["push constant 0"]
+evalTerm (UnaryExpression (u, t)) sc =
+  let tc = evalTerm t sc
       uo = unaryToOp u
    in tc ++ [uo]
-evalTerm _ _ (ArrayIndex (i, e)) (_, code) = undefined
-evalTerm cn fn (ExpressionTerm e) (symbols, code) = evalExpression cn fn e (symbols, code)
-evalTerm (Identifier cn) fn (FunctionCall (Identifier n, es)) sc =
-  let ces = map (\e -> evalExpression (Identifier cn) fn e sc) es
+evalTerm (ArrayIndex (i, e)) sc@(cn, fn, symbols, _) =
+  let (Just (vs, _, vi)) = lookup (i, fn) symbols <|> lookup (i, cn) symbols
+      ce = evalExpression e sc
+   in ["push " ++ varScopeToMemorySegment vs ++ " " ++ show vi]
+        ++ ce
+        ++ [ "add",
+             "pop pointer 1",
+             "push that 0"
+           ]
+evalTerm (ExpressionTerm e) sc = evalExpression e sc
+evalTerm (FunctionCall (Identifier n, es)) sc@(cn, _, _, _) =
+  let ces = map (flip evalExpression sc) es
       argCount = length ces
-   in concat ces ++ ["call " ++ cn ++ "." ++ n ++ " " ++ show argCount]
-evalTerm cn fn (MethodCall (ci, Identifier mi, es)) (symbols, code) =
-  let ces = map (\e -> evalExpression cn fn e (symbols, code)) es
-      (Identifier ci') = case lookup (ci, fn) symbols of
-        Nothing -> ci
-        (Just (_, ClassType n, _)) -> n
+   in concat ces ++ ["call " ++ show cn ++ "." ++ n ++ " " ++ show argCount]
+evalTerm (MethodCall (ci, mi, es)) sc@(_, fn, symbols, _) =
+  let ces = map (flip evalExpression sc) es
       argCount = length ces
-   in ["push pointer 0"]
-        ++ concat ces
-        ++ ["call " ++ ci' ++ "." ++ mi ++ " " ++ show argCount]
+   in case lookup (ci, fn) symbols of
+        (Just (vs, ClassType n, vi)) ->
+          ["push " ++ varScopeToMemorySegment vs ++ " " ++ show vi]
+            ++ concat ces
+            ++ [ "call " ++ show n ++ "." ++ show mi ++ " " ++ show (argCount + 1)
+               ]
+        Nothing ->
+          concat ces
+            ++ ["call " ++ show ci ++ "." ++ show mi ++ " " ++ show argCount]
 
-evalExpression :: Identifier -> Identifier -> Expression -> (VarTable, Code) -> Code
-evalExpression cn fn (Expression (t, ots)) sc =
+evalExpression :: Expression -> Environment -> Code
+evalExpression (Expression (t, ots)) sc =
   let os = map fst ots
       ts = reverse $ map snd ots
-      cts = concat $ map (\t -> evalTerm cn fn t sc) ts ++ [evalTerm cn fn t sc]
+      cts = concat $ map (flip evalTerm sc) ts ++ [evalTerm t sc]
       cos = map opToArithmeticAndLogic os
    in cts ++ cos
