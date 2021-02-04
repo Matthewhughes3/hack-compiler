@@ -21,10 +21,10 @@ evalClassStatement cn (FunctionDec (ft, _, fn, tis, fs)) (symbols, code) =
   let argumentVars = case ft of
         Method -> getVar 0 fn (Argument, tis) symbols
         _ -> getVar (-1) fn (Argument, tis) symbols
-      (localVars, funcCode) =
+      (localVars, funcCode, _) =
         foldl
-          (\(s, c) f -> evalFunctionStatement f (Environment {cn = cn, fn = fn, st = s, code = c}))
-          (argumentVars, [])
+          (\(s, c, lc) f -> evalFunctionStatement f (Environment {cn = cn, fn = fn, st = s, code = c, lc = lc}))
+          (argumentVars, [], 0)
           fs
       lvc = getLocalVarCount localVars
       (Identifier cns) = cn
@@ -46,13 +46,14 @@ evalClassStatement cn (FunctionDec (ft, _, fn, tis, fs)) (symbols, code) =
       code' = fullFunctionHeader ++ funcCode
    in (localVars ++ symbols, code ++ [code'])
 
-evalFunctionStatement :: FunctionStatement -> Environment -> (VarTable, Code)
+evalFunctionStatement :: FunctionStatement -> Environment -> (VarTable, Code, Int)
 evalFunctionStatement (FunctionVarDec (t, is)) env =
   let tis = map (\i -> (t, i)) is
-   in (getVar (-1) (fn env) (Local, tis) (st env), code env)
+      (vt, c) = (getVar (-1) (fn env) (Local, tis) (st env), code env)
+   in (vt, c, lc env)
 evalFunctionStatement (FunctionStatement stm) env =
-  let cst = evalStatement stm env
-   in (st env, code env ++ cst)
+  let (cst, lc) = evalStatement stm env
+   in (st env, code env ++ cst, lc)
 
 getVar :: Int -> Identifier -> (VarScope, [(Type, Identifier)]) -> VarTable -> VarTable
 getVar _ _ (_, []) symbols = symbols

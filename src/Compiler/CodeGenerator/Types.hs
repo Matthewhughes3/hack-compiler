@@ -13,6 +13,6 @@ data Environment = Environment
   { fn :: Identifier,
     cn :: Identifier,
     st :: VarTable,
-    lc :: Code,
+    lc :: Int,
     code :: Code
   }
