@@ -1,39 +1,42 @@
 module Compiler.CodeGenerator.ProgramStructure where
 
+import Compiler.CodeGenerator.Environment
 import Compiler.CodeGenerator.Statements
-import Compiler.CodeGenerator.Types
 import Compiler.Parser.LexicalElements
 import Compiler.Parser.ProgramStructure
+import State
 
-evalClass :: Class -> Code
-evalClass (Class (n, cs)) =
-  let (_, code) = foldl (\(s, c) st -> evalClassStatement n st (s, c)) ([], []) cs
-   in concat code
+evalClass :: Class -> State Environment Code
+evalClass (Class (n, cs)) = do
+  setEnv setCn n
+  concat <$> traverse evalClassStatement cs
 
-getLocalVarCount :: VarTable -> Int
-getLocalVarCount vt = length $ filter (\(_, (vs, _, _)) -> vs == Local) vt
+getLocalVarCount :: State Environment Int
+getLocalVarCount = State $ \env -> (length $ filter (\(_, (vs, _, _)) -> vs == Local) (st env), env)
 
-evalClassStatement :: Identifier -> ClassStatement -> (VarTable, [Code]) -> (VarTable, [Code])
-evalClassStatement cn (ClassVarDec (vs, t, is)) (symbols, code) =
+evalClassStatement :: ClassStatement -> State Environment Code
+evalClassStatement (ClassVarDec (vs, t, is)) = do
   let tis = map (\i -> (t, i)) is
-   in (getVar (-1) cn (vs, tis) symbols ++ symbols, code)
-evalClassStatement cn (FunctionDec (ft, _, fn, tis, fs)) (symbols, code) =
+  cName <- getEnv cn
+  sTable <- getEnv st
+  setEnv setSt (getVars (-1) cName (vs, tis) sTable)
+  return []
+evalClassStatement (FunctionDec (ft, _, fName, tis, fs)) = do
+  setEnv setFn fName
+  sTable <- getEnv st
   let argumentVars = case ft of
-        Method -> getVar 0 fn (Argument, tis) symbols
-        _ -> getVar (-1) fn (Argument, tis) symbols
-      (localVars, funcCode, _) =
-        foldl
-          (\(s, c, lc) f -> evalFunctionStatement f (Environment {cn = cn, fn = fn, st = s, code = c, lc = lc}))
-          (argumentVars, [], 0)
-          fs
-      lvc = getLocalVarCount localVars
-      (Identifier cns) = cn
-      (Identifier ns) = fn
-      functionHeader = ("function " ++ cns ++ "." ++ ns ++ " " ++ show lvc)
-      fullFunctionHeader =
+        Method -> getVars 0 fName (Argument, tis) sTable
+        _ -> getVars (-1) fName (Argument, tis) sTable
+  setEnv setSt (sTable ++ argumentVars)
+  cfs <- concat <$> traverse evalFunctionStatement fs
+  sTable' <- getEnv st
+  lvc <- getLocalVarCount
+  cName <- getEnv cn
+  let functionHeader = "function " ++ show cName ++ "." ++ show fName ++ " " ++ show lvc
+  let fullFunctionHeader =
         functionHeader : case ft of
           Constructor ->
-            let fieldCount = length $ filter (\((_, n), (vs, _, _)) -> n == cn && vs == Field) symbols
+            let fieldCount = length $ filter (\((_, n), (vs, _, _)) -> n == cName && vs == Field) sTable'
              in [ "push constant " ++ show fieldCount,
                   "call Memory.alloc 1",
                   "pop pointer 0"
@@ -43,22 +46,21 @@ evalClassStatement cn (FunctionDec (ft, _, fn, tis, fs)) (symbols, code) =
               "pop pointer 0"
             ]
           Function -> []
-      code' = fullFunctionHeader ++ funcCode
-   in (localVars ++ symbols, code ++ [code'])
+  return (fullFunctionHeader ++ cfs)
 
-evalFunctionStatement :: FunctionStatement -> Environment -> (VarTable, Code, Int)
-evalFunctionStatement (FunctionVarDec (t, is)) env =
+evalFunctionStatement :: FunctionStatement -> State Environment Code
+evalFunctionStatement (FunctionVarDec (t, is)) = do
   let tis = map (\i -> (t, i)) is
-      (vt, c) = (getVar (-1) (fn env) (Local, tis) (st env), code env)
-   in (vt, c, lc env)
-evalFunctionStatement (FunctionStatement stm) env =
-  let (cst, lc) = evalStatement stm env
-   in (st env, code env ++ cst, lc)
+  fName <- getEnv fn
+  sTable <- getEnv st
+  setEnv setSt (getVars (-1) fName (Local, tis) sTable)
+  return []
+evalFunctionStatement (FunctionStatement stm) = evalStatement stm
 
-getVar :: Int -> Identifier -> (VarScope, [(Type, Identifier)]) -> VarTable -> VarTable
-getVar _ _ (_, []) symbols = symbols
-getVar index n (vs, (t, i) : tis) symbols =
+getVars :: Int -> Identifier -> (VarScope, [(Type, Identifier)]) -> VarTable -> VarTable
+getVars _ _ (_, []) symbols = symbols
+getVars index n (vs, (t, i) : tis) symbols =
   let scopeVars = filter (\((_, n'), (vs', _, _)) -> n == n' && vs == vs') symbols
       scopeIndices = map (\(_, (_, _, i)) -> i) scopeVars
       lastIndex = foldl (\acc x -> if x > acc then x else acc) index scopeIndices
-   in getVar index n (vs, tis) (((i, n), (vs, t, lastIndex + 1)) : symbols)
+   in getVars index n (vs, tis) (((i, n), (vs, t, lastIndex + 1)) : symbols)

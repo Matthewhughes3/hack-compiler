@@ -1,10 +1,11 @@
 module Compiler.CodeGenerator.Expressions where
 
-import Compiler.CodeGenerator.Types
+import Compiler.CodeGenerator.Environment
 import Compiler.Parser.Expressions
 import Compiler.Parser.LexicalElements
 import Compiler.Parser.ProgramStructure
 import Control.Applicative
+import State
 
 memorySegments :: [(VarScope, String)]
 memorySegments =
@@ -48,50 +49,64 @@ unaryToOp u =
   case lookup u unary of
     (Just u') -> u'
 
-evalTerm :: Term -> Environment -> Code
-evalTerm (Var i) env =
-  let (Just (vs, _, vi)) = lookup (i, fn env) (st env) <|> lookup (i, cn env) (st env)
-   in ["push " ++ varScopeToMemorySegment vs ++ " " ++ show vi]
-evalTerm (IntegerConstant i) _ = ["push constant " ++ show i]
-evalTerm (StringConstant s) _ = undefined
-evalTerm (BoolConstant b) _ = if b then ["push constant 1"] else ["push constant 0"]
-evalTerm This _ = ["push pointer 0"]
-evalTerm Null _ = ["push constant 0"]
-evalTerm (UnaryExpression (u, t)) sc =
-  let tc = evalTerm t sc
-      uo = unaryToOp u
-   in tc ++ [uo]
-evalTerm (ArrayIndex (i, e)) env =
-  let (Just (vs, _, vi)) = lookup (i, fn env) (st env) <|> lookup (i, cn env) (st env)
-      ce = evalExpression e env
-   in ["push " ++ varScopeToMemorySegment vs ++ " " ++ show vi]
-        ++ ce
-        ++ [ "add",
-             "pop pointer 1",
-             "push that 0"
-           ]
-evalTerm (ExpressionTerm e) sc = evalExpression e sc
-evalTerm (FunctionCall (Identifier n, es)) env =
-  let ces = map (flip evalExpression env) es
-      argCount = length ces
-   in concat ces ++ ["call " ++ show (cn env) ++ "." ++ n ++ " " ++ show argCount]
-evalTerm (MethodCall (ci, mi, es)) env =
-  let ces = map (flip evalExpression env) es
-      argCount = length ces
-   in case lookup (ci, fn env) (st env) of
-        (Just (vs, ClassType n, vi)) ->
-          ["push " ++ varScopeToMemorySegment vs ++ " " ++ show vi]
-            ++ concat ces
-            ++ [ "call " ++ show n ++ "." ++ show mi ++ " " ++ show (argCount + 1)
-               ]
-        Nothing ->
-          concat ces
-            ++ ["call " ++ show ci ++ "." ++ show mi ++ " " ++ show argCount]
+getVar :: Identifier -> State Environment (Maybe (VarScope, Type, Int))
+getVar i = State $ \env -> (lookup (i, fn env) (st env) <|> lookup (i, cn env) (st env), env)
 
-evalExpression :: Expression -> Environment -> Code
-evalExpression (Expression (t, ots)) env =
+evalTerm :: Term -> State Environment Code
+evalTerm (Var i) = do
+  -- TODO: make this beautiful
+  v <- getVar i
+  case v of
+    Nothing -> error (show i ++ " is not defined")
+    (Just (vs, _, vi)) -> return ["push " ++ varScopeToMemorySegment vs ++ " " ++ show vi]
+evalTerm (IntegerConstant i) = return ["push constant " ++ show i]
+evalTerm (StringConstant s) = undefined
+evalTerm (BoolConstant b) = if b then return ["push constant 1"] else return ["push constant 0"]
+evalTerm This = return ["push pointer 0"]
+evalTerm Null = return ["push constant 0"]
+evalTerm (UnaryExpression (u, t)) = do
+  tc <- evalTerm t
+  return (tc ++ [unaryToOp u])
+evalTerm (ArrayIndex (i, e)) = do
+  -- TODO: make this beautiful
+  v <- getVar i
+  case v of
+    Nothing -> undefined
+    (Just (vs, _, vi)) -> do
+      ce <- evalExpression e
+      return
+        ( ["push " ++ varScopeToMemorySegment vs ++ " " ++ show vi]
+            ++ ce
+            ++ [ "add",
+                 "pop pointer 1",
+                 "push that 0"
+               ]
+        )
+evalTerm (ExpressionTerm e) = evalExpression e
+evalTerm (FunctionCall (Identifier n, es)) = do
+  ces <- traverse evalExpression es
+  let argCount = length ces
+  cName <- getEnv cn
+  return (concat ces ++ ["call " ++ show cName ++ "." ++ n ++ " " ++ show argCount])
+evalTerm (MethodCall (ci, mi, es)) = do
+  ces <- traverse evalExpression es
+  let argCount = length ces
+  fName <- getEnv fn
+  sTable <- getEnv st
+  case lookup (ci, fName) sTable of
+    (Just (vs, ClassType n, vi)) ->
+      return
+        ( ["push " ++ varScopeToMemorySegment vs ++ " " ++ show vi]
+            ++ concat ces
+            ++ ["call " ++ show n ++ "." ++ show mi ++ " " ++ show (argCount + 1)]
+        )
+    Nothing -> return (concat ces ++ ["call " ++ show ci ++ "." ++ show mi ++ " " ++ show argCount])
+
+evalExpression :: Expression -> State Environment Code
+evalExpression (Expression (t, ots)) = do
   let os = map fst ots
-      ts = reverse $ map snd ots
-      cts = concat $ map (flip evalTerm env) ts ++ [evalTerm t env]
-      cos = map opToArithmeticAndLogic os
-   in cts ++ cos
+  let ts = reverse $ map snd ots
+  cts <- concat <$> traverse evalTerm ts
+  ct <- evalTerm t
+  let cos = map opToArithmeticAndLogic os
+  return (cts ++ ct ++ cos)
