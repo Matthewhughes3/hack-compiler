@@ -36,4 +36,4 @@ builtinLabels =
   ]
 
 labelAllocStart :: Int
-labelAllocStart = 128
+labelAllocStart = 16

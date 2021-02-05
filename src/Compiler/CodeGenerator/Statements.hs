@@ -10,26 +10,23 @@ makeUniqueId = State $ \env -> ("." ++ show (cn env) ++ "." ++ show (fn env) ++ 
 
 evalStatement :: Statement -> State Environment Code
 evalStatement (LetStatement (i, ae, e)) = do
-  v <- getVar i
-  case v of
-    Nothing -> undefined
-    (Just (vs, _, vi)) -> do
-      ce <- evalExpression e
-      case ae of
-        Nothing -> return (ce ++ ["pop " ++ varScopeToMemorySegment vs ++ " " ++ show vi])
-        (Just ae') -> do
-          cae <- evalExpression ae'
-          return
-            ( ["push " ++ varScopeToMemorySegment vs ++ " " ++ show vi]
-                ++ cae
-                ++ ["add"]
-                ++ ce
-                ++ [ "pop temp 0",
-                     "pop pointer 1",
-                     "push temp 0",
-                     "pop that 0"
-                   ]
-            )
+  (vs, vi) <- getVar i
+  ce <- evalExpression e
+  case ae of
+    Nothing -> return (ce ++ ["pop " ++ varScopeToMemorySegment vs ++ " " ++ show vi])
+    (Just ae') -> do
+      cae <- evalExpression ae'
+      return
+        ( ["push " ++ varScopeToMemorySegment vs ++ " " ++ show vi]
+            ++ cae
+            ++ ["add"]
+            ++ ce
+            ++ [ "pop temp 0",
+                 "pop pointer 1",
+                 "push temp 0",
+                 "pop that 0"
+               ]
+        )
 evalStatement (IfElseStatement (e, ists, ests)) = do
   lCount <- getEnv lc
   setEnv setLc (lCount + 1)

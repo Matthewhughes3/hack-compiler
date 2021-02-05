@@ -9,6 +9,7 @@ data Term
   = Var Identifier
   | IntegerConstant Int
   | StringConstant String
+  | CharConstant Char
   | BoolConstant Bool
   | This
   | Null
@@ -98,6 +99,9 @@ integerConstant = IntegerConstant . read <$> token number
 stringConstant :: Parser Term
 stringConstant = StringConstant <$> token stringLiteral
 
+charConstant :: Parser Term
+charConstant = CharConstant <$> token charLiteral
+
 keywordConstant :: Parser Term
 keywordConstant = token $ stringToKeywordConstant <$> oneOfS (map fst keywordConstants)
 
@@ -118,6 +122,7 @@ term =
   arrayIndex
     <|> integerConstant
     <|> stringConstant
+    <|> charConstant
     <|> keywordConstant
     <|> unaryExpression
     <|> expressionTerm

@@ -36,7 +36,7 @@ evalClassStatement (FunctionDec (ft, _, fName, tis, fs)) = do
   let fullFunctionHeader =
         functionHeader : case ft of
           Constructor ->
-            let fieldCount = length $ filter (\((_, n), (vs, _, _)) -> n == cName && vs == Field) sTable'
+            let fieldCount = length $ filter (\((_, n), (vs, _, _)) -> n == cName && vs == Field) sTable
              in [ "push constant " ++ show fieldCount,
                   "call Memory.alloc 1",
                   "pop pointer 0"

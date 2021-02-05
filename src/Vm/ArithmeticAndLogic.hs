@@ -36,7 +36,7 @@ translateCommand line cmd = case cmd of
   "sub" ->
     popD
       ++ [ "A=A-1",
-           "M=D-M"
+           "M=M-D"
          ]
   "neg" ->
     [ stackPointer,
@@ -46,7 +46,7 @@ translateCommand line cmd = case cmd of
   "eq" ->
     popD
       ++ [ "A=A-1",
-           "D=D-M",
+           "D=M-D",
            getLabel "EQ" line,
            "D;JEQ",
            stackPointer,
@@ -63,7 +63,7 @@ translateCommand line cmd = case cmd of
   "gt" ->
     popD
       ++ [ "A=A-1",
-           "D=D-M",
+           "D=M-D",
            getLabel "GT" line,
            "D; JGT",
            stackPointer,
@@ -80,7 +80,7 @@ translateCommand line cmd = case cmd of
   "lt" ->
     popD
       ++ [ "A=A-1",
-           "D=D-M",
+           "D=M-D",
            getLabel "LT" line,
            "D; JLT",
            stackPointer,

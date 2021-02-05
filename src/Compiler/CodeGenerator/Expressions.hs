@@ -5,6 +5,7 @@ import Compiler.Parser.Expressions
 import Compiler.Parser.LexicalElements
 import Compiler.Parser.ProgramStructure
 import Control.Applicative
+import Data.Char
 import State
 
 memorySegments :: [(VarScope, String)]
@@ -34,6 +35,7 @@ unary =
     (Not, "not")
   ]
 
+-- TODO: handle Nothings
 varScopeToMemorySegment :: VarScope -> String
 varScopeToMemorySegment vs =
   case lookup vs memorySegments of
@@ -49,18 +51,32 @@ unaryToOp u =
   case lookup u unary of
     (Just u') -> u'
 
-getVar :: Identifier -> State Environment (Maybe (VarScope, Type, Int))
-getVar i = State $ \env -> (lookup (i, fn env) (st env) <|> lookup (i, cn env) (st env), env)
+getVar :: Identifier -> State Environment (VarScope, Int)
+getVar i = State $ \env -> case lookup (i, fn env) (st env) <|> lookup (i, cn env) (st env) of
+  (Just (vs, _, vi)) -> ((vs, vi), env)
 
 evalTerm :: Term -> State Environment Code
 evalTerm (Var i) = do
-  -- TODO: make this beautiful
-  v <- getVar i
-  case v of
-    Nothing -> error (show i ++ " is not defined")
-    (Just (vs, _, vi)) -> return ["push " ++ varScopeToMemorySegment vs ++ " " ++ show vi]
+  (vs, vi) <- getVar i
+  return ["push " ++ varScopeToMemorySegment vs ++ " " ++ show vi]
 evalTerm (IntegerConstant i) = return ["push constant " ++ show i]
-evalTerm (StringConstant s) = undefined
+evalTerm (StringConstant s) =
+  return
+    ( [ "push constant " ++ show (length s),
+        "call String.new 1",
+        "pop temp 1"
+      ]
+        ++ concatMap
+          ( \c ->
+              [ "push temp 1",
+                "push constant " ++ show (ord c),
+                "call String.appendChar 2"
+              ]
+          )
+          s
+        ++ ["push temp 1"]
+    )
+evalTerm (CharConstant c) = return ["push constant " ++ show (ord c)]
 evalTerm (BoolConstant b) = if b then return ["push constant 1"] else return ["push constant 0"]
 evalTerm This = return ["push pointer 0"]
 evalTerm Null = return ["push constant 0"]
@@ -68,20 +84,16 @@ evalTerm (UnaryExpression (u, t)) = do
   tc <- evalTerm t
   return (tc ++ [unaryToOp u])
 evalTerm (ArrayIndex (i, e)) = do
-  -- TODO: make this beautiful
-  v <- getVar i
-  case v of
-    Nothing -> undefined
-    (Just (vs, _, vi)) -> do
-      ce <- evalExpression e
-      return
-        ( ["push " ++ varScopeToMemorySegment vs ++ " " ++ show vi]
-            ++ ce
-            ++ [ "add",
-                 "pop pointer 1",
-                 "push that 0"
-               ]
-        )
+  (vs, vi) <- getVar i
+  ce <- evalExpression e
+  return
+    ( ["push " ++ varScopeToMemorySegment vs ++ " " ++ show vi]
+        ++ ce
+        ++ [ "add",
+             "pop pointer 1",
+             "push that 0"
+           ]
+    )
 evalTerm (ExpressionTerm e) = evalExpression e
 evalTerm (FunctionCall (Identifier n, es)) = do
   ces <- traverse evalExpression es
@@ -92,8 +104,9 @@ evalTerm (MethodCall (ci, mi, es)) = do
   ces <- traverse evalExpression es
   let argCount = length ces
   fName <- getEnv fn
+  cName <- getEnv cn
   sTable <- getEnv st
-  case lookup (ci, fName) sTable of
+  case lookup (ci, fName) sTable <|> lookup (ci, cName) sTable of
     (Just (vs, ClassType n, vi)) ->
       return
         ( ["push " ++ varScopeToMemorySegment vs ++ " " ++ show vi]
@@ -104,9 +117,8 @@ evalTerm (MethodCall (ci, mi, es)) = do
 
 evalExpression :: Expression -> State Environment Code
 evalExpression (Expression (t, ots)) = do
-  let os = map fst ots
-  let ts = reverse $ map snd ots
+  let os = reverse $ map fst ots
+  let ts = t : map snd ots
   cts <- concat <$> traverse evalTerm ts
-  ct <- evalTerm t
   let cos = map opToArithmeticAndLogic os
-  return (cts ++ ct ++ cos)
+  return (cts ++ cos)

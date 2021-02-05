@@ -86,6 +86,13 @@ stringLiteral = do
   satisfy (== '"')
   return s
 
+charLiteral :: Parser Char
+charLiteral = do
+  satisfy (== '\'')
+  s <- satisfy (/= '\'')
+  satisfy (== '\'')
+  return s
+
 spaces :: Parser String
 spaces = many $ oneOf " \n\r"
 
