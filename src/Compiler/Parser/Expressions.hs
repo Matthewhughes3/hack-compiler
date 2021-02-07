@@ -18,7 +18,7 @@ data Term
   | ExpressionTerm Expression
   | FunctionCall (Identifier, [Expression])
   | MethodCall (Identifier, Identifier, [Expression])
-  deriving (Show)
+  deriving (Show, Eq)
 
 data Op
   = Add
@@ -39,7 +39,7 @@ data UnaryOp
 
 newtype Expression
   = Expression (Term, [(Op, Term)])
-  deriving (Show)
+  deriving (Show, Eq)
 
 ops :: [(String, Op)]
 ops =

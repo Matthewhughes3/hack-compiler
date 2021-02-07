@@ -32,14 +32,3 @@ makeLabel label line = "(" ++ label ++ show line ++ ")"
 
 getLabel :: String -> Int -> String
 getLabel label line = "@" ++ label ++ show line
-
-initAddress :: (String, String) -> [String]
-initAddress (segPtr, baseAddr) =
-  [ "@" ++ baseAddr,
-    "D=A",
-    segPtr,
-    "M=D"
-  ]
-
-initAddresses :: [String]
-initAddresses = "//INITIALIZE BASE ADDRESSES" : concatMap initAddress baseAddresses

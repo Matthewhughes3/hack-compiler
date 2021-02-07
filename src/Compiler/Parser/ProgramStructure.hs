@@ -8,12 +8,12 @@ import NanoParsec
 
 newtype Class
   = Class (Identifier, [ClassStatement])
-  deriving (Show)
+  deriving (Show, Eq)
 
 data ClassStatement
   = ClassVarDec (VarScope, Type, [Identifier])
   | FunctionDec (FunctionType, Maybe Type, Identifier, [(Type, Identifier)], [FunctionStatement])
-  deriving (Show)
+  deriving (Show, Eq)
 
 data VarScope
   = Static
@@ -25,20 +25,20 @@ data VarScope
 data FunctionStatement
   = FunctionVarDec (Type, [Identifier])
   | FunctionStatement Statement
-  deriving (Show)
+  deriving (Show, Eq)
 
 data FunctionType
   = Constructor
   | Function
   | Method
-  deriving (Show)
+  deriving (Show, Eq)
 
 data Type
   = IntType
   | CharType
   | BoolType
   | ClassType Identifier
-  deriving (Show)
+  deriving (Show, Eq)
 
 varScopeTypes :: [(String, VarScope)]
 varScopeTypes =

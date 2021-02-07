@@ -12,7 +12,7 @@ data Statement
   | WhileStatement (Expression, [Statement])
   | DoStatement Term
   | ReturnStatement (Maybe Expression)
-  deriving (Show)
+  deriving (Show, Eq)
 
 letStatement :: Parser Statement
 letStatement = do

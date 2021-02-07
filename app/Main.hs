@@ -40,13 +40,10 @@ main = do
       let readFiles = map (\f -> "./" ++ file ++ "/" ++ f) files
       let filenames = map (takeWhile (/= '.')) files
       contents <- mapM readFile readFiles
-      contents' <- flip zipListOfLists 0 . map lines <$> mapM (uncurry writeVm) (zip contents filenames)
-      let contents'' = concatMap (uncurry vm) (zip filenames contents')
-      let header = vm "" (zip ["call Main.main 0", "goto END"] [1 ..])
-      let footer = vm "" (zip ["label END", "goto END"] [1 ..])
-      let code = header ++ contents'' ++ footer
-      writeFile ("dist/" ++ filename ++ assemblyExtension) code
-      writeHex code filename
+      contents' <- map lines <$> mapM (uncurry writeVm) (zip contents filenames)
+      let contents'' = vmDir filenames contents'
+      writeFile ("dist/" ++ filename ++ assemblyExtension) contents''
+      writeHex contents'' filename
     "a" -> do
       contents <- readFile file
       writeHex contents filename
@@ -98,10 +95,9 @@ writeAssembly :: String -> String -> IO String
 writeAssembly contents filename = do
   let contents' = formatVm contents
   let newFile = filename ++ assemblyExtension
-  let code = ["call Main.main 0", "goto END"] ++ contents' ++ ["label END", "goto END"]
-  let contents' = vm filename (zip code [1 ..])
-  writeFile ("dist/" ++ newFile) contents'
-  return contents'
+  let contents'' = vm False filename (zip contents' [1 ..])
+  writeFile ("dist/" ++ newFile) contents''
+  return contents''
 
 writeVm :: String -> String -> IO String
 writeVm contents filename = do

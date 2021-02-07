@@ -38,6 +38,7 @@ library
       Compiler.CodeGenerator.ProgramStructure
       Compiler.CodeGenerator.Statements
       Compiler.Compiler
+      Compiler.DependencyManager.DependencyManager
       Compiler.Parser
       Compiler.Parser.Expressions
       Compiler.Parser.LexicalElements

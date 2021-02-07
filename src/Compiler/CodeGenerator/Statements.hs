@@ -37,7 +37,8 @@ evalStatement (IfElseStatement (e, ists, ests)) = do
   return
     ( ce
         ++ [ "not",
-             "if-goto ELSE" ++ uid
+             "if-goto ELSE" ++ uid,
+             "pop temp 2"
            ]
         ++ cists
         ++ [ "goto ENDIF" ++ uid,
@@ -56,7 +57,8 @@ evalStatement (WhileStatement (e, sts)) = do
     ( ["label WHILE" ++ uid]
         ++ ce
         ++ [ "not",
-             "if-goto ENDWHILE" ++ uid
+             "if-goto ENDWHILE" ++ uid,
+             "pop temp 2"
            ]
         ++ csts
         ++ [ "goto WHILE"
