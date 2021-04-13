@@ -131,7 +131,18 @@ function = do
   i <- identifier
   ps <- parens parameterList
   fs <- braces $ many functionStatement
-  return (FunctionDec (ft, t, i, ps, fs))
+  return (FunctionDec (ft, t, i, ps, addImplicitReturn fs))
+
+-- TODO: Saturate this function with relevant info, like line no. and adapt it to throw an error if the function isn't void
+addImplicitReturn :: [FunctionStatement] -> [FunctionStatement]
+addImplicitReturn fs = let hasReturn = foldl (\hr f -> isReturn f || hr) False fs
+                       in  if hasReturn then fs else fs ++ [FunctionStatement (ReturnStatement Nothing)]
+
+isReturn :: FunctionStatement -> Bool
+isReturn f = 
+  case f of
+    FunctionStatement (ReturnStatement _) -> True
+    _ -> False
 
 classVar :: Parser ClassStatement
 classVar = do
