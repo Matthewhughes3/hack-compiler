@@ -80,10 +80,10 @@ evalTerm (CharConstant c) = return ["push constant " ++ show (ord c)]
 evalTerm (BoolConstant b) = if b then return ["push constant 1"] else return ["push constant 0"]
 evalTerm This = return ["push pointer 0"]
 evalTerm Null = return ["push constant 0"]
-evalTerm (UnaryExpression (u, t)) = do
+evalTerm (UnaryExpression u t) = do
   tc <- evalTerm t
   return (tc ++ [unaryToOp u])
-evalTerm (ArrayIndex (i, e)) = do
+evalTerm (ArrayIndex i e) = do
   (vs, vi) <- getVar i
   ce <- evalExpression e
   return
@@ -95,12 +95,12 @@ evalTerm (ArrayIndex (i, e)) = do
            ]
     )
 evalTerm (ExpressionTerm e) = evalExpression e
-evalTerm (FunctionCall (Identifier n, es)) = do
+evalTerm (FunctionCall (Identifier n) es) = do
   ces <- traverse evalExpression es
   let argCount = length ces
   cName <- getEnv cn
   return (concat ces ++ ["call " ++ show cName ++ "." ++ n ++ " " ++ show argCount])
-evalTerm (MethodCall (ci, mi, es)) = do
+evalTerm (MethodCall ci mi es) = do
   ces <- traverse evalExpression es
   let argCount = length ces
   fName <- getEnv fn
@@ -116,7 +116,7 @@ evalTerm (MethodCall (ci, mi, es)) = do
     Nothing -> return (concat ces ++ ["call " ++ show ci ++ "." ++ show mi ++ " " ++ show argCount])
 
 evalExpression :: Expression -> State Environment Code
-evalExpression (Expression (t, ots)) = do
+evalExpression (Expression t ots) = do
   let os = reverse $ map fst ots
   let ts = t : map snd ots
   cts <- concat <$> traverse evalTerm ts

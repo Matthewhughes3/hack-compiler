@@ -13,11 +13,11 @@ data Term
   | BoolConstant Bool
   | This
   | Null
-  | UnaryExpression (UnaryOp, Term)
-  | ArrayIndex (Identifier, Expression)
+  | UnaryExpression UnaryOp Term
+  | ArrayIndex Identifier Expression
   | ExpressionTerm Expression
-  | FunctionCall (Identifier, [Expression])
-  | MethodCall (Identifier, Identifier, [Expression])
+  | FunctionCall Identifier [Expression]
+  | MethodCall Identifier Identifier [Expression]
   deriving (Show, Eq)
 
 data Op
@@ -37,8 +37,8 @@ data UnaryOp
   | Not
   deriving (Show, Eq)
 
-newtype Expression
-  = Expression (Term, [(Op, Term)])
+data Expression
+  = Expression Term [(Op, Term)]
   deriving (Show, Eq)
 
 ops :: [(String, Op)]
@@ -109,13 +109,13 @@ unaryExpression :: Parser Term
 unaryExpression = do
   o <- unaryOp
   t <- term
-  return (UnaryExpression (o, t))
+  return (UnaryExpression o t)
 
 arrayIndex :: Parser Term
 arrayIndex = do
   i <- identifier
   e <- squareBrackets expression
-  return (ArrayIndex (i, e))
+  return (ArrayIndex i e)
 
 term :: Parser Term
 term =
@@ -131,11 +131,10 @@ term =
     <|> Var <$> identifier
 
 expression :: Parser Expression
-expression =
-  Expression <$> do
-    a <- term
-    bs <- rest []
-    return (a, bs)
+expression = do
+  a <- term
+  bs <- rest []
+  return (Expression a bs)
   where
     rest ots =
       ( do
@@ -169,7 +168,7 @@ functionCall :: Parser Term
 functionCall = do
   i <- identifier
   es <- parens expressionList
-  return (FunctionCall (i, es))
+  return (FunctionCall i es)
 
 methodCall :: Parser Term
 methodCall = do
@@ -177,4 +176,4 @@ methodCall = do
   reservedSymbol "."
   m <- identifier
   es <- parens expressionList
-  return (MethodCall (c, m, es))
+  return (MethodCall c m es)

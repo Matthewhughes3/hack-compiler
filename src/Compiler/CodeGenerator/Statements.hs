@@ -9,7 +9,7 @@ makeUniqueId :: State Environment String
 makeUniqueId = State $ \env -> ("." ++ show (cn env) ++ "." ++ show (fn env) ++ "." ++ show (lc env), env)
 
 evalStatement :: Statement -> State Environment Code
-evalStatement (LetStatement (i, ae, e)) = do
+evalStatement (LetStatement i ae e) = do
   (vs, vi) <- getVar i
   ce <- evalExpression e
   case ae of
@@ -27,7 +27,7 @@ evalStatement (LetStatement (i, ae, e)) = do
                  "pop that 0"
                ]
         )
-evalStatement (IfElseStatement (e, ists, ests)) = do
+evalStatement (IfElseStatement e ists ests) = do
   lCount <- getEnv lc
   setEnv setLc (lCount + 1)
   ce <- evalExpression e
@@ -46,7 +46,7 @@ evalStatement (IfElseStatement (e, ists, ests)) = do
         ++ cests
         ++ ["label ENDIF" ++ uid]
     )
-evalStatement (WhileStatement (e, sts)) = do
+evalStatement (WhileStatement e sts) = do
   lCount <- getEnv lc
   setEnv setLc (lCount + 1)
   ce <- evalExpression e

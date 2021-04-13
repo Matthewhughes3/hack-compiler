@@ -11,4 +11,4 @@ aInstruction =
     number
 
 compileA :: String -> Bin
-compileA addr = Bin (read addr, 16)
+compileA addr = Bin (read addr) 16

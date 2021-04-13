@@ -26,10 +26,10 @@ intelHex bs = unlines $ intelH 0 bs
 
 intelHexLine :: Bin -> Int -> String
 intelHexLine bin startAddr =
-  let addr = Hex (startAddr, 4)
+  let addr = Hex startAddr 4
       d = showLittleEndian $ binToHex bin
-      t = Hex (0, 2)
-      byteCount = Hex (2, 2)
+      t = Hex 0 2
+      byteCount = Hex 2 2
       hs = read (show (hexAppend [byteCount, addr, t]) ++ d)
       cs = checksum hs
    in ':' : show hs ++ show cs

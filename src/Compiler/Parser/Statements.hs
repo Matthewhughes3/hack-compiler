@@ -7,9 +7,9 @@ import Control.Applicative
 import NanoParsec
 
 data Statement
-  = LetStatement (Identifier, Maybe Expression, Expression)
-  | IfElseStatement (Expression, [Statement], [Statement])
-  | WhileStatement (Expression, [Statement])
+  = LetStatement Identifier (Maybe Expression) Expression
+  | IfElseStatement Expression [Statement] [Statement]
+  | WhileStatement Expression [Statement]
   | DoStatement Term
   | ReturnStatement (Maybe Expression)
   deriving (Show, Eq)
@@ -22,7 +22,7 @@ letStatement = do
   reservedSymbol "="
   e <- expression
   reservedSymbol ";"
-  return (LetStatement (i, ae, e))
+  return (LetStatement i ae e)
 
 ifElseStatement :: Parser Statement
 ifElseStatement = do
@@ -30,7 +30,7 @@ ifElseStatement = do
   e <- parens expression
   s <- braces $ many statement
   es <- elseStatement
-  return (IfElseStatement (e, s, es))
+  return (IfElseStatement e s es)
   where
     elseStatement =
       ( do
@@ -44,7 +44,7 @@ whileStatement = do
   reserved "while"
   e <- parens expression
   s <- braces $ many statement
-  return (WhileStatement (e, s))
+  return (WhileStatement e s)
 
 doStatement :: Parser Statement
 doStatement = do

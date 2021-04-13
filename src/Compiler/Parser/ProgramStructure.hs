@@ -6,13 +6,13 @@ import Compiler.Parser.Statements
 import Control.Applicative
 import NanoParsec
 
-newtype Class
-  = Class (Identifier, [ClassStatement])
+data Class
+  = Class Identifier [ClassStatement]
   deriving (Show, Eq)
 
 data ClassStatement
-  = ClassVarDec (VarScope, Type, [Identifier])
-  | FunctionDec (FunctionType, Maybe Type, Identifier, [(Type, Identifier)], [FunctionStatement])
+  = ClassVarDec VarScope Type [Identifier]
+  | FunctionDec FunctionType (Maybe Type) Identifier [(Type, Identifier)] [FunctionStatement]
   deriving (Show, Eq)
 
 data VarScope
@@ -23,7 +23,7 @@ data VarScope
   deriving (Show, Eq)
 
 data FunctionStatement
-  = FunctionVarDec (Type, [Identifier])
+  = FunctionVarDec Type [Identifier]
   | FunctionStatement Statement
   deriving (Show, Eq)
 
@@ -93,7 +93,7 @@ functionVar = do
   i <- identifier
   is <- rest [i]
   reservedSymbol ";"
-  return (FunctionVarDec (t, is))
+  return (FunctionVarDec t is)
   where
     rest is =
       ( do
@@ -131,15 +131,16 @@ function = do
   i <- identifier
   ps <- parens parameterList
   fs <- braces $ many functionStatement
-  return (FunctionDec (ft, t, i, ps, addImplicitReturn fs))
+  return (FunctionDec ft t i ps (addImplicitReturn fs))
 
 -- TODO: Saturate this function with relevant info, like line no. and adapt it to throw an error if the function isn't void
 addImplicitReturn :: [FunctionStatement] -> [FunctionStatement]
-addImplicitReturn fs = let hasReturn = foldl (\hr f -> isReturn f || hr) False fs
-                       in  if hasReturn then fs else fs ++ [FunctionStatement (ReturnStatement Nothing)]
+addImplicitReturn fs =
+  let hasReturn = foldl (\hr f -> isReturn f || hr) False fs
+   in if hasReturn then fs else fs ++ [FunctionStatement (ReturnStatement Nothing)]
 
 isReturn :: FunctionStatement -> Bool
-isReturn f = 
+isReturn f =
   case f of
     FunctionStatement (ReturnStatement _) -> True
     _ -> False
@@ -154,7 +155,7 @@ classVar = do
       i <- identifier
       is <- rest [i]
       reservedSymbol ";"
-      return (ClassVarDec (vs, t, is))
+      return (ClassVarDec vs t is)
   where
     rest is =
       ( do
@@ -172,4 +173,4 @@ classDec = do
   reserved "class"
   i <- identifier
   cs <- braces $ many classStatement
-  return (Class (i, cs))
+  return (Class i cs)
