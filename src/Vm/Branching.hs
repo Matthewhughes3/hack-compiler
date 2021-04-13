@@ -32,7 +32,7 @@ translateBranch line cmd label = case cmd of
     ]
   "if-goto" ->
     [ stackPointer,
-      "A=M-1",
+      "AM=M-1",
       "D=M",
       "@" ++ label,
       "D; JGT"
